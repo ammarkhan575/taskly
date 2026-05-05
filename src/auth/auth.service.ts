@@ -1,14 +1,26 @@
-import { Injectable } from '@nestjs/common';
+import { ConsoleLogger, Injectable } from '@nestjs/common';
 import { RegisterDto } from './dto/register.dto';
-import { UserService } from 'src/user/user.service';
+import { UserService } from '../user/user.service';
+import { JwtService } from '@nestjs/jwt';
 
 @Injectable()
 export class AuthService {
-    constructor(private readonly userService: UserService) {}
-    register(registerDto: RegisterDto) {
+    private readonly logger = new ConsoleLogger(AuthService.name);
+    constructor(private readonly userService: UserService, private readonly jwtService: JwtService) {}
+    async register(registerDto: RegisterDto) {
         const {name, email, password} = registerDto;
-        // Here you would typically save the user to the database and perform any necessary logic
-        // For this example, we'll just return a success message
+        const existingUser = await this.userService.findUserByEmail(email);
+        if(existingUser) {
+            throw new Error('User with this email already exists');
+        }
+        const user = await this.userService.createUser(name, email, password);
+        const payload = { sub: user.userId, username: user.username };
+        return {
+        // 💡 Here the JWT secret key that's used for signing the payload 
+        // is the key that was passed in the JwtModule
+        access_token: await this.jwtService.signAsync(payload),
+        };
+        this.logger.log('User registered successfully');
         return 'User registered successfully';
     }
 }
